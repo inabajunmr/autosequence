@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>HTTP Sequence Diagram</title>
+  <script src="mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    .header {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    
+    .header h1 {
+      margin: 0 0 10px 0;
+      color: #333;
+    }
+    
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    .export-btn {
+      background-color: #4CAF50;
+      color: white;
+    }
+    
+    .export-btn:hover {
+      background-color: #45a049;
+    }
+    
+    .refresh-btn {
+      background-color: #2196F3;
+      color: white;
+    }
+    
+    .refresh-btn:hover {
+      background-color: #1976D2;
+    }
+    
+    .diagram-container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      overflow-x: auto;
+    }
+    
+    #diagram {
+      min-height: 200px;
+      text-align: center;
+    }
+    
+    .loading {
+      color: #666;
+      font-style: italic;
+    }
+    
+    .error {
+      color: #f44336;
+      background-color: #ffebee;
+      padding: 15px;
+      border-radius: 4px;
+      border-left: 4px solid #f44336;
+    }
+    
+    .info {
+      background-color: #e3f2fd;
+      padding: 15px;
+      border-radius: 4px;
+      border-left: 4px solid #2196F3;
+      margin-bottom: 20px;
+    }
+    
+    .stats {
+      display: flex;
+      gap: 20px;
+      font-size: 14px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>HTTP Request Sequence Diagram</h1>
+    <div class="controls">
+      <div class="stats">
+        <span>リクエスト数: <span id="request-count">-</span></span>
+        <span>ドメイン数: <span id="domain-count">-</span></span>
+      </div>
+      <button id="refresh-btn" class="refresh-btn">更新</button>
+      <button id="export-btn" class="export-btn">SVGエクスポート</button>
+      <button id="copy-btn" class="export-btn">Mermaidコードをコピー</button>
+    </div>
+  </div>
+  
+  <div class="info">
+    このダイアグラムは記録されたHTTPリクエストを時系列順に表示します。同じドメインへのリクエストは同じparticipantとしてグループ化されます。
+  </div>
+  
+  <div class="diagram-container">
+    <div id="diagram" class="loading">ダイアグラムを読み込み中...</div>
+  </div>
+  
+  <script src="diagram.js"></script>
+</body>
+</html>
