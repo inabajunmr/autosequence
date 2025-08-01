@@ -112,9 +112,15 @@ function generateMermaidFromRequests(requests, selectedDomains = null) {
     
     // レスポンス
     if (req.completed) {
-      diagram += `    ${toAlias}-->>-${fromAlias}: ${status}\n`;
-    } else {
-      diagram += `    ${toAlias}-->>-${fromAlias}: (pending)\n`;
+      let responseText = status;
+      if (req.redirectUrl) {
+        const redirectDomain = new URL(req.redirectUrl).hostname;
+        responseText += ` → ${redirectDomain}`;
+      }
+      if (req.error) {
+        responseText = `Error: ${req.error}`;
+      }
+      diagram += `    ${toAlias}-->>-${fromAlias}: ${responseText}\n`;
     }
   });
   
