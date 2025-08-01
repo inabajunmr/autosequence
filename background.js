@@ -50,7 +50,7 @@ chrome.webRequest.onCompleted.addListener(
   function(details) {
     if (!isRecording) return;
     
-    // 該当するリクエストを見つけて更新
+    // 該当するリクエストを見つけて更新（より柔軟な検索）
     const request = recordedRequests.find(req => 
       req.url === details.url && 
       req.tabId === details.tabId &&
@@ -62,6 +62,54 @@ chrome.webRequest.onCompleted.addListener(
       request.completed = true;
       request.responseTime = Date.now() - request.timestamp;
       console.log('Request completed:', request);
+    } else {
+      // 見つからない場合のデバッグ情報
+      console.log('No matching request found for:', details.url, details.statusCode);
+    }
+  },
+  {urls: ["<all_urls>"]}
+);
+
+// リダイレクトも記録
+chrome.webRequest.onBeforeRedirect.addListener(
+  function(details) {
+    if (!isRecording) return;
+    
+    // リダイレクト元のリクエストを完了とマーク
+    const request = recordedRequests.find(req => 
+      req.url === details.url && 
+      req.tabId === details.tabId &&
+      !req.completed
+    );
+    
+    if (request) {
+      request.statusCode = details.statusCode;
+      request.completed = true;
+      request.responseTime = Date.now() - request.timestamp;
+      request.redirectUrl = details.redirectUrl;
+      console.log('Request redirected:', request);
+    }
+  },
+  {urls: ["<all_urls>"]}
+);
+
+// エラー時も記録
+chrome.webRequest.onErrorOccurred.addListener(
+  function(details) {
+    if (!isRecording) return;
+    
+    const request = recordedRequests.find(req => 
+      req.url === details.url && 
+      req.tabId === details.tabId &&
+      !req.completed
+    );
+    
+    if (request) {
+      request.statusCode = 'Error';
+      request.completed = true;
+      request.error = details.error;
+      request.responseTime = Date.now() - request.timestamp;
+      console.log('Request failed:', request);
     }
   },
   {urls: ["<all_urls>"]}

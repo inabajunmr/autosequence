@@ -1,4 +1,6 @@
 let currentDiagramCode = '';
+let allRequests = [];
+let selectedDomains = new Set();
 
 // Mermaidを初期化
 mermaid.initialize({
@@ -24,6 +26,9 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('refresh-btn').addEventListener('click', loadDiagram);
   document.getElementById('export-btn').addEventListener('click', exportSVG);
   document.getElementById('copy-btn').addEventListener('click', copyMermaidCode);
+  document.getElementById('select-all-btn').addEventListener('click', selectAllDomains);
+  document.getElementById('select-none-btn').addEventListener('click', selectNoneDomains);
+  document.getElementById('apply-filter-btn').addEventListener('click', applyDomainFilter);
 });
 
 function loadDiagram() {
@@ -33,26 +38,21 @@ function loadDiagram() {
     const diagramDiv = document.getElementById('diagram');
     
     if (result.requests && result.requests.length > 0) {
-      const requests = result.requests;
-      const domains = new Set(requests.map(req => req.domain));
+      allRequests = result.requests;
+      const domains = new Set(allRequests.map(req => req.domain));
       
       // 統計を更新
-      document.getElementById('request-count').textContent = requests.length;
+      document.getElementById('request-count').textContent = allRequests.length;
       document.getElementById('domain-count').textContent = domains.size;
       
-      // Mermaidダイアグラムを生成
-      currentDiagramCode = generateMermaidFromRequests(requests);
-      console.log('Generated diagram:', currentDiagramCode);
+      // ドメイン選択UIを構築
+      buildDomainFilter(Array.from(domains));
       
-      // Mermaidダイアグラムをレンダリング
-      mermaid.render('mermaid-diagram', currentDiagramCode)
-        .then(({svg}) => {
-          diagramDiv.innerHTML = svg;
-        })
-        .catch(error => {
-          console.error('Mermaid rendering error:', error);
-          diagramDiv.innerHTML = `<div class="error">ダイアグラムの生成に失敗しました: ${error.message}</div>`;
-        });
+      // 初期選択は全ドメイン
+      selectedDomains = new Set(domains);
+      
+      // ダイアグラムを生成・表示
+      updateDiagram();
     } else {
       // デフォルトダイアグラムを表示
       currentDiagramCode = "sequenceDiagram\n    Note over Browser: No requests recorded\n    Note over Browser: Click 'Start' in popup to begin recording";
@@ -68,15 +68,27 @@ function loadDiagram() {
   });
 }
 
-function generateMermaidFromRequests(requests) {
+function generateMermaidFromRequests(requests, selectedDomains = null) {
   if (!requests || requests.length === 0) {
     return "sequenceDiagram\n    Note over Browser: No requests recorded";
   }
   
+  // 選択されたドメインでフィルタリング
+  const filteredRequests = selectedDomains ? 
+    requests.filter(req => selectedDomains.has(req.domain)) : 
+    requests;
+  
+  if (filteredRequests.length === 0) {
+    return "sequenceDiagram\n    Note over Browser: No requests for selected domains";
+  }
+  
   let diagram = "sequenceDiagram\n";
   
-  // ドメインを抽出してparticipantを定義
-  const domains = Array.from(new Set(requests.map(req => req.domain))).sort();
+  // 選択されたドメインのみでparticipantを定義
+  const domains = selectedDomains ? 
+    Array.from(selectedDomains).sort() : 
+    Array.from(new Set(requests.map(req => req.domain))).sort();
+    
   domains.forEach(domain => {
     const alias = domain.replace(/[.-]/g, '_');
     diagram += `    participant ${alias} as ${domain}\n`;
@@ -84,11 +96,11 @@ function generateMermaidFromRequests(requests) {
   
   diagram += "\n";
   
-  // 完了していないリクエストも含める（レスポンスなしとして）
-  const allRequests = requests.sort((a, b) => a.timestamp - b.timestamp);
+  // リクエストをタイムスタンプ順にソート
+  const sortedRequests = filteredRequests.sort((a, b) => a.timestamp - b.timestamp);
   
   // シーケンスを生成（最大50件）
-  allRequests.slice(0, 50).forEach((req, index) => {
+  sortedRequests.slice(0, 50).forEach((req, index) => {
     const fromAlias = "Browser";
     const toAlias = req.domain.replace(/[.-]/g, '_');
     const method = req.method;
@@ -106,8 +118,8 @@ function generateMermaidFromRequests(requests) {
     }
   });
   
-  if (allRequests.length > 50) {
-    diagram += `    Note over Browser: ... (${allRequests.length - 50} more requests)\n`;
+  if (sortedRequests.length > 50) {
+    diagram += `    Note over Browser: ... (${sortedRequests.length - 50} more requests)\n`;
   }
   
   return diagram;
@@ -154,4 +166,80 @@ function copyMermaidCode() {
     document.body.removeChild(textarea);
     alert('Mermaidコードをクリップボードにコピーしました');
   });
+}
+
+function buildDomainFilter(domains) {
+  const domainList = document.getElementById('domain-list');
+  domainList.innerHTML = '';
+  
+  domains.sort().forEach(domain => {
+    const checkbox = document.createElement('label');
+    checkbox.className = 'domain-checkbox selected';
+    
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = true;
+    input.value = domain;
+    input.addEventListener('change', function() {
+      if (this.checked) {
+        selectedDomains.add(domain);
+        checkbox.classList.add('selected');
+      } else {
+        selectedDomains.delete(domain);
+        checkbox.classList.remove('selected');
+      }
+    });
+    
+    const label = document.createElement('span');
+    label.textContent = domain;
+    
+    checkbox.appendChild(input);
+    checkbox.appendChild(label);
+    domainList.appendChild(checkbox);
+  });
+}
+
+function selectAllDomains() {
+  const checkboxes = document.querySelectorAll('#domain-list input[type="checkbox"]');
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = true;
+    selectedDomains.add(checkbox.value);
+    checkbox.parentElement.classList.add('selected');
+  });
+}
+
+function selectNoneDomains() {
+  const checkboxes = document.querySelectorAll('#domain-list input[type="checkbox"]');
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = false;
+    selectedDomains.delete(checkbox.value);
+    checkbox.parentElement.classList.remove('selected');
+  });
+}
+
+function applyDomainFilter() {
+  updateDiagram();
+}
+
+function updateDiagram() {
+  const diagramDiv = document.getElementById('diagram');
+  
+  // Mermaidダイアグラムを生成
+  currentDiagramCode = generateMermaidFromRequests(allRequests, selectedDomains);
+  console.log('Generated filtered diagram:', currentDiagramCode);
+  
+  // 統計を更新
+  const filteredRequests = allRequests.filter(req => selectedDomains.has(req.domain));
+  document.getElementById('request-count').textContent = `${filteredRequests.length} / ${allRequests.length}`;
+  document.getElementById('domain-count').textContent = `${selectedDomains.size} / ${new Set(allRequests.map(req => req.domain)).size}`;
+  
+  // Mermaidダイアグラムをレンダリング
+  mermaid.render('mermaid-diagram-filtered', currentDiagramCode)
+    .then(({svg}) => {
+      diagramDiv.innerHTML = svg;
+    })
+    .catch(error => {
+      console.error('Mermaid rendering error:', error);
+      diagramDiv.innerHTML = `<div class="error">ダイアグラムの生成に失敗しました: ${error.message}</div>`;
+    });
 }
