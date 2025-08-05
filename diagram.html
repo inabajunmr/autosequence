@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>HTTP Sequence Diagram</title>
+  <script src="node_modules/mermaid/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    .header {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    
+    .header h1 {
+      margin: 0 0 10px 0;
+      color: #333;
+    }
+    
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    .export-btn {
+      background-color: #4CAF50;
+      color: white;
+    }
+    
+    .export-btn:hover {
+      background-color: #45a049;
+    }
+    
+    .refresh-btn {
+      background-color: #2196F3;
+      color: white;
+    }
+    
+    .refresh-btn:hover {
+      background-color: #1976D2;
+    }
+    
+    .diagram-container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      overflow-x: auto;
+    }
+    
+    #diagram {
+      min-height: 200px;
+      text-align: center;
+    }
+    
+    .loading {
+      color: #666;
+      font-style: italic;
+    }
+    
+    .error {
+      color: #f44336;
+      background-color: #ffebee;
+      padding: 15px;
+      border-radius: 4px;
+      border-left: 4px solid #f44336;
+    }
+    
+    .info {
+      background-color: #e3f2fd;
+      padding: 15px;
+      border-radius: 4px;
+      border-left: 4px solid #2196F3;
+      margin-bottom: 20px;
+    }
+    
+    .stats {
+      display: flex;
+      gap: 20px;
+      font-size: 14px;
+      color: #666;
+    }
+    
+    .domain-filter {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    
+    .domain-filter h3 {
+      margin: 0 0 15px 0;
+      color: #333;
+      font-size: 16px;
+    }
+    
+    .domain-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    
+    .domain-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+    
+    .domain-checkbox:hover {
+      background-color: #e0e0e0;
+    }
+    
+    .domain-checkbox input[type="checkbox"] {
+      margin: 0;
+    }
+    
+    .domain-checkbox.selected {
+      background-color: #e3f2fd;
+      border: 1px solid #2196F3;
+    }
+    
+    .filter-controls {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
+    }
+    
+    .filter-btn {
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: white;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    
+    .filter-btn:hover {
+      background-color: #f5f5f5;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>HTTP Request Sequence Diagram</h1>
+    <div class="controls">
+      <div class="stats">
+        <span>Requests: <span id="request-count">-</span></span>
+        <span>Domains: <span id="domain-count">-</span></span>
+      </div>
+      <button id="refresh-btn" class="refresh-btn">Refresh</button>
+      <button id="export-btn" class="export-btn">Export SVG</button>
+      <button id="copy-btn" class="export-btn">Copy Mermaid Code</button>
+    </div>
+  </div>
+  
+  <div class="info">
+    This diagram displays recorded HTTP requests in chronological order. Requests to the same domain are grouped as the same participant.
+  </div>
+  
+  <div class="domain-filter">
+    <h3>Show Domains (Participants)</h3>
+    <div class="domain-list" id="domain-list">
+      <!-- Domain selection checkboxes will be added here dynamically -->
+    </div>
+    <div class="filter-controls">
+      <button class="filter-btn" id="select-all-domains-btn">Select All</button>
+      <button class="filter-btn" id="select-none-domains-btn">Select None</button>
+    </div>
+  </div>
+  
+  <div class="domain-filter">
+    <h3>Show Content Types</h3>
+    <div class="domain-list" id="type-list">
+      <!-- Content type selection checkboxes will be added here dynamically -->
+    </div>
+    <div class="filter-controls">
+      <button class="filter-btn" id="select-all-types-btn">Select All</button>
+      <button class="filter-btn" id="select-none-types-btn">Select None</button>
+      <button class="filter-btn" id="apply-filter-btn">Apply Filter</button>
+    </div>
+  </div>
+  
+  <div class="diagram-container">
+    <div id="diagram" class="loading">Loading diagram...</div>
+  </div>
+  
+  <script src="diagram.js"></script>
+</body>
+</html>
