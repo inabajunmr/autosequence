@@ -24,14 +24,35 @@ mermaid.initialize({
 document.addEventListener('DOMContentLoaded', function() {
   loadDiagram();
   
-  document.getElementById('refresh-btn').addEventListener('click', loadDiagram);
   document.getElementById('export-btn').addEventListener('click', exportSVG);
   document.getElementById('copy-btn').addEventListener('click', copyMermaidCode);
   document.getElementById('select-all-domains-btn').addEventListener('click', selectAllDomains);
   document.getElementById('select-none-domains-btn').addEventListener('click', selectNoneDomains);
   document.getElementById('select-all-types-btn').addEventListener('click', selectAllTypes);
   document.getElementById('select-none-types-btn').addEventListener('click', selectNoneTypes);
-  document.getElementById('apply-filter-btn').addEventListener('click', applyFilter);
+  
+  // Register this tab for real-time updates
+  chrome.runtime.sendMessage({action: 'registerDiagramTab'});
+  
+  // Listen for real-time updates from background script
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log('Diagram received message:', request);
+    
+    switch(request.action) {
+      case 'requestAdded':
+      case 'requestCompleted':
+        // Reload diagram when new requests are added or completed, preserving filters
+        reloadDiagramPreservingFilters();
+        break;
+    }
+    
+    sendResponse({success: true});
+  });
+  
+  // Unregister when page is closed
+  window.addEventListener('beforeunload', function() {
+    chrome.runtime.sendMessage({action: 'unregisterDiagramTab'});
+  });
 });
 
 function loadDiagram() {
@@ -49,17 +70,33 @@ function loadDiagram() {
       document.getElementById('request-count').textContent = allRequests.length;
       document.getElementById('domain-count').textContent = domains.size;
       
+      // Initial selection: no domains, only xhr and document
+      if (selectedDomains.size === 0) {
+        selectedDomains = new Set(); // Start with empty set (no domains selected)
+      }
+      if (selectedTypes.size === 0) {
+        selectedTypes = new Set(['xhr', 'document']);
+      }
+      
       // Build filter UI
       buildDomainFilter(Array.from(domains));
-      buildTypeFilter(Array.from(types));
-      
-      // Initial selection is all domains, only xhr and document
-      selectedDomains = new Set(domains);
-      selectedTypes = new Set(['xhr', 'document']);
+      buildTypeFilter(); // Always show all types, not just existing ones
       
       // Generate and display diagram
       updateDiagram();
     } else {
+      // No requests yet, but still show filter UI with defaults
+      if (selectedDomains.size === 0) {
+        selectedDomains = new Set(); // Start with empty set (no domains selected)
+      }
+      if (selectedTypes.size === 0) {
+        selectedTypes = new Set(['xhr', 'document']);
+      }
+      
+      // Show empty filters
+      buildDomainFilter([]);
+      buildTypeFilter(); // Always show all types, even with no requests
+      
       // Display default diagram
       currentDiagramCode = "sequenceDiagram\n    Note over Browser: No requests recorded\n    Note over Browser: Click 'Start' in popup to begin recording";
       
@@ -193,12 +230,13 @@ function buildDomainFilter(domains) {
   domainList.innerHTML = '';
   
   domains.sort().forEach(domain => {
+    const isSelected = selectedDomains.has(domain);
     const checkbox = document.createElement('label');
-    checkbox.className = 'domain-checkbox selected';
+    checkbox.className = isSelected ? 'domain-checkbox selected' : 'domain-checkbox';
     
     const input = document.createElement('input');
     input.type = 'checkbox';
-    input.checked = true;
+    input.checked = isSelected;
     input.value = domain;
     input.addEventListener('change', function() {
       if (this.checked) {
@@ -208,6 +246,7 @@ function buildDomainFilter(domains) {
         selectedDomains.delete(domain);
         checkbox.classList.remove('selected');
       }
+      updateDiagram(); // Auto-refresh diagram on filter change
     });
     
     const label = document.createElement('span');
@@ -226,6 +265,7 @@ function selectAllDomains() {
     selectedDomains.add(checkbox.value);
     checkbox.parentElement.classList.add('selected');
   });
+  updateDiagram(); // Auto-refresh diagram after bulk change
 }
 
 function selectNoneDomains() {
@@ -235,6 +275,7 @@ function selectNoneDomains() {
     selectedDomains.delete(checkbox.value);
     checkbox.parentElement.classList.remove('selected');
   });
+  updateDiagram(); // Auto-refresh diagram after bulk change
 }
 
 function getContentType(request) {
@@ -270,26 +311,21 @@ function getContentType(request) {
   }
 }
 
-function buildTypeFilter(types) {
+function buildTypeFilter() {
   const typeList = document.getElementById('type-list');
   typeList.innerHTML = '';
   
-  // Define type order
-  const typeOrder = ['document', 'css', 'js', 'image', 'font', 'xhr', 'websocket', 'media', 'other', 'unknown'];
-  const sortedTypes = types.sort((a, b) => {
-    const indexA = typeOrder.indexOf(a);
-    const indexB = typeOrder.indexOf(b);
-    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-  });
+  // Define all possible types in order
+  const allTypes = ['xhr', 'document', 'css', 'js', 'font', 'image', 'media', 'websocket', 'other', 'unknown'];
   
-  sortedTypes.forEach(type => {
+  allTypes.forEach(type => {
+    const isSelected = selectedTypes.has(type);
     const checkbox = document.createElement('label');
-    const isDefaultSelected = type === 'xhr' || type === 'document';
-    checkbox.className = isDefaultSelected ? 'domain-checkbox selected' : 'domain-checkbox';
+    checkbox.className = isSelected ? 'domain-checkbox selected' : 'domain-checkbox';
     
     const input = document.createElement('input');
     input.type = 'checkbox';
-    input.checked = isDefaultSelected;
+    input.checked = isSelected;
     input.value = type;
     input.addEventListener('change', function() {
       if (this.checked) {
@@ -299,6 +335,7 @@ function buildTypeFilter(types) {
         selectedTypes.delete(type);
         checkbox.classList.remove('selected');
       }
+      updateDiagram(); // Auto-refresh diagram on filter change
     });
     
     const label = document.createElement('span');
@@ -317,6 +354,7 @@ function selectAllTypes() {
     selectedTypes.add(checkbox.value);
     checkbox.parentElement.classList.add('selected');
   });
+  updateDiagram(); // Auto-refresh diagram after bulk change
 }
 
 function selectNoneTypes() {
@@ -326,11 +364,9 @@ function selectNoneTypes() {
     selectedTypes.delete(checkbox.value);
     checkbox.parentElement.classList.remove('selected');
   });
+  updateDiagram(); // Auto-refresh diagram after bulk change
 }
 
-function applyFilter() {
-  updateDiagram();
-}
 
 function updateDiagram() {
   const diagramDiv = document.getElementById('diagram');
@@ -355,4 +391,29 @@ function updateDiagram() {
       console.error('Mermaid rendering error:', error);
       diagramDiv.innerHTML = `<div class="error">Failed to generate diagram: ${error.message}</div>`;
     });
+}
+
+function reloadDiagramPreservingFilters() {
+  console.log('Reloading diagram while preserving filters...');
+  chrome.storage.local.get(['requests'], function(result) {
+    console.log('Storage result for filter-preserving reload:', result);
+    const diagramDiv = document.getElementById('diagram');
+    
+    if (result.requests && result.requests.length > 0) {
+      allRequests = result.requests;
+      const domains = new Set(allRequests.map(req => req.domain));
+      const types = new Set(allRequests.map(req => getContentType(req)));
+      
+      // Update statistics
+      document.getElementById('request-count').textContent = allRequests.length;
+      document.getElementById('domain-count').textContent = domains.size;
+      
+      // Rebuild filter UI but preserve selections
+      buildDomainFilter(Array.from(domains));
+      buildTypeFilter(); // Always show all types, not just existing ones
+      
+      // Generate and display diagram with current filters
+      updateDiagram();
+    }
+  });
 }

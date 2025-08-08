@@ -4,6 +4,7 @@ let isRecording = false;
 let recordedRequests = [];
 let domainMap = new Map();
 let requestId = 0;
+let diagramTabIds = new Set();
 
 // Capture HTTP requests using WebRequest API
 chrome.webRequest.onBeforeRequest.addListener(
@@ -40,6 +41,9 @@ chrome.webRequest.onBeforeRequest.addListener(
       requests: recordedRequests,
       domains: Array.from(domainMap.entries())
     });
+    
+    // Notify diagram tabs of new request
+    notifyDiagramTabs('requestAdded', request);
   },
   {urls: ["<all_urls>"]},
   ["requestBody"]
@@ -62,6 +66,9 @@ chrome.webRequest.onCompleted.addListener(
       request.completed = true;
       request.responseTime = Date.now() - request.timestamp;
       console.log('Request completed:', request);
+      
+      // Notify diagram tabs of request completion
+      notifyDiagramTabs('requestCompleted', request);
     } else {
       // Debug info when not found
       console.log('No matching request found for:', details.url, details.statusCode);
@@ -168,6 +175,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({diagram: diagram});
         break;
         
+      case 'registerDiagramTab':
+        console.log('Registering diagram tab:', sender.tab.id);
+        diagramTabIds.add(sender.tab.id);
+        sendResponse({success: true});
+        break;
+        
+      case 'unregisterDiagramTab':
+        console.log('Unregistering diagram tab:', sender.tab.id);
+        diagramTabIds.delete(sender.tab.id);
+        sendResponse({success: true});
+        break;
+        
       default:
         console.log('Unknown action:', request.action);
         sendResponse({error: 'Unknown action'});
@@ -245,4 +264,25 @@ chrome.storage.local.get(['requests', 'domains'], function(result) {
     requestCount: recordedRequests.length,
     domainCount: domainMap.size
   });
+});
+
+// Function to notify diagram tabs of updates
+function notifyDiagramTabs(action, data) {
+  if (diagramTabIds.size === 0) return;
+  
+  diagramTabIds.forEach(tabId => {
+    chrome.tabs.sendMessage(tabId, {
+      action: action,
+      data: data
+    }).catch(error => {
+      // Remove inactive tabs
+      console.log('Removing inactive diagram tab:', tabId);
+      diagramTabIds.delete(tabId);
+    });
+  });
+}
+
+// Clean up closed tabs
+chrome.tabs.onRemoved.addListener((tabId) => {
+  diagramTabIds.delete(tabId);
 });
